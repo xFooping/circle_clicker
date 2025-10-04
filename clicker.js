@@ -1,6 +1,5 @@
 // Enhanced clicker.js - WITH COSMETICS & IMPROVED PROGRESSION
 const SAVE_KEY = "clickerSave_v7";
-const PREVIOUS_SAVE_KEYS = ["clickerSave_v6", "clickerSave_v5", "clickerSave_v4", "clickerSave_v3", "clickerSave_v2", "clickerSave_v1"];
 const AUTOSAVE_INTERVAL_MS = 60000;
 const PRESTIGE_BASE = 1e6;
 const PRESTIGE_MULT_PER_POINT = 0.05;
@@ -95,6 +94,8 @@ let achievements = ACHIEVEMENTS.map(a => ({ ...a, unlocked: false }));
 let comboCount = 0;
 let comboTimer = null;
 let goldenActive = false;
+let activeBugs = [];
+let bugSpawnTimer = null;
 
 function trimTrailingZeros(str) {
   return str.replace(/(\.\d*?[1-9])0+$/,'$1').replace(/\.0+$/,'');
@@ -624,21 +625,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderCosmetics() {
     cosmeticsGrid.innerHTML = "";
-    COSMETICS.forEach(cosmetic => {
-      if (cosmetic.secret && !state.ownedCosmetics.includes(cosmetic.id)) return;
-      
+    
+    // Regular cosmetics first
+    COSMETICS.filter(c => !c.secret).forEach(cosmetic => {
       const card = document.createElement("div");
       card.className = "upgrade-card cosmetic-upgrade";
       
       const owned = state.ownedCosmetics.includes(cosmetic.id);
       const equipped = state.currentCosmetic === cosmetic.id;
       
-      const previewClass = cosmetic.className || '';
+      if (owned) {
+        card.classList.add("cosmetic-card-owned");
+      }
+      
+      const previewStyle = cosmetic.className ? `class="${cosmetic.className}"` : '';
       
       card.innerHTML = `
         <div class="row">
           <div style="flex:1">
-            <div class="cosmetic-preview ${previewClass}" style="background: ${cosmetic.className ? 'var(--circle-color)' : 'radial-gradient(circle at 30% 20%, #7bd0ff, #06b6d4 30%, #04718b 100%)'}"></div>
+            <div class="cosmetic-preview" ${previewStyle}></div>
             <div class="upgrade-title" style="text-align:center">${cosmetic.name}</div>
             <div class="upgrade-desc" style="text-align:center">${cosmetic.desc}</div>
           </div>
@@ -664,6 +669,48 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     });
+    
+    // Secret cosmetic at the end
+    const secretCosmetic = COSMETICS.find(c => c.secret);
+    if (secretCosmetic) {
+      const owned = state.ownedCosmetics.includes(secretCosmetic.id);
+      const equipped = state.currentCosmetic === secretCosmetic.id;
+      
+      const card = document.createElement("div");
+      card.className = "upgrade-card cosmetic-upgrade";
+      
+      if (!owned) {
+        card.classList.add("cosmetic-card-secret");
+      } else {
+        card.classList.add("cosmetic-card-owned", "unlocked");
+      }
+      
+      const previewStyle = owned ? `class="${secretCosmetic.className}"` : '';
+      
+      card.innerHTML = `
+        <div class="row">
+          <div style="flex:1">
+            <div class="cosmetic-preview" ${previewStyle}></div>
+            <div class="upgrade-title" style="text-align:center">${owned ? secretCosmetic.name : '???'}</div>
+            <div class="upgrade-desc" style="text-align:center">${owned ? secretCosmetic.desc : 'Secret cosmetic'}</div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:8px">
+          <button class="buy-btn" id="cosmetic-${secretCosmetic.id}" ${owned ? (equipped ? 'disabled' : '') : 'disabled'} style="width:100%">
+            ${equipped ? 'Equipped' : (owned ? 'Equip' : '???')}
+          </button>
+        </div>
+      `;
+      
+      cosmeticsGrid.appendChild(card);
+      
+      if (owned) {
+        const btn = card.querySelector(`#cosmetic-${secretCosmetic.id}`);
+        if (btn && !btn.disabled) {
+          btn.addEventListener("click", () => equipCosmetic(secretCosmetic.id));
+        }
+      }
+    }
   }
 
   function buyCosmetic(id) {
@@ -1324,122 +1371,87 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-function loadGame() {
-  try {
-    let raw = localStorage.getItem(SAVE_KEY);
-    
-    // If current version doesn't exist, try to migrate from previous versions
-    if (!raw) {
-      for (let oldKey of PREVIOUS_SAVE_KEYS) {
-        raw = localStorage.getItem(oldKey);
-        if (raw) {
-          console.log(`Migrating save from ${oldKey} to ${SAVE_KEY}`);
-          break;
-        }
-      }
-    }
-    
-    if (!raw) return false;
-    const payload = JSON.parse(raw);
-    
-    if (payload.state) {
-      const timeDiff = Date.now() - (payload.timestamp || Date.now());
-      const offlineMinutes = Math.floor(timeDiff / 60000);
+  function loadGame() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return false;
+      const payload = JSON.parse(raw);
       
-      if (offlineMinutes > 5) {
-        let offlineMult = 1;
-        const ppOffline = prestigeUpgrades.find(p => p.id === "pp_offline");
-        if (ppOffline && ppOffline.level >= 1) offlineMult = ppOffline.effect;
+      if (payload.state) {
+        const timeDiff = Date.now() - (payload.timestamp || Date.now());
+        const offlineMinutes = Math.floor(timeDiff / 60000);
         
-        const idleRate = calcTotalIdle();
-        const offlineGain = idleRate * offlineMinutes * 60 * 0.5 * offlineMult;
-        
-        if (offlineGain > 0) {
-          payload.state.points = (payload.state.points || 0) + offlineGain;
-          pushToast(`Offline for ${formatTime(offlineMinutes)}: +${formatNumber(offlineGain)} points`, 4000, "success");
+        if (offlineMinutes > 5) {
+          let offlineMult = 1;
+          const ppOffline = prestigeUpgrades.find(p => p.id === "pp_offline");
+          if (ppOffline && ppOffline.level >= 1) offlineMult = ppOffline.effect;
+          
+          const idleRate = calcTotalIdle();
+          const offlineGain = idleRate * offlineMinutes * 60 * 0.5 * offlineMult;
+          
+          if (offlineGain > 0) {
+            payload.state.points = (payload.state.points || 0) + offlineGain;
+            pushToast(`Offline for ${formatTime(offlineMinutes)}: +${formatNumber(offlineGain)} points`, 4000, "success");
+          }
         }
+        
+        state = Object.assign(state, payload.state);
+      }
+      if (payload.upgrades) {
+        payload.upgrades.forEach(su => {
+          const u = upgrades.find(x => x.id === su.id);
+          if (u) { u.level = su.level ?? u.level; u.cost = su.cost ?? u.cost; }
+        });
+      }
+      if (payload.prestigeUpgrades) {
+        payload.prestigeUpgrades.forEach(pu => {
+          const u = prestigeUpgrades.find(x => x.id === pu.id);
+          if (u) {
+            u.level = pu.level ?? (pu.owned ? 1 : 0);
+            u.cost = pu.cost ?? u.baseCost;
+          }
+        });
+      }
+      if (payload.achievements) {
+        payload.achievements.forEach(a => {
+          const ac = achievements.find(x => x.id === a.id);
+          if (ac) ac.unlocked = !!a.unlocked;
+        });
       }
       
-      // Migrate/merge state - add new properties with defaults if they don't exist
-      state = Object.assign({
-        version: 7,
-        ownedCosmetics: ['default'],
-        currentCosmetic: 'default',
-        totalClicks: 0,
-        totalPointsEarned: 0,
-        totalUpgradesBought: 0,
-        goldenClicks: 0,
-        totalPrestiges: 0,
-        totalAscensions: 0,
-        ascensionLevel: 0,
-        lastDailyReward: 0,
-        dailyStreak: 0,
-        goldenUnlocked: false,
-        comboUnlocked: false
-      }, payload.state);
-    }
-    
-    if (payload.upgrades) {
-      payload.upgrades.forEach(su => {
-        const u = upgrades.find(x => x.id === su.id);
-        if (u) { u.level = su.level ?? u.level; u.cost = su.cost ?? u.cost; }
+      if (!state.ownedCosmetics) state.ownedCosmetics = ['default'];
+      if (!state.currentCosmetic) state.currentCosmetic = 'default';
+      
+      document.body.className = `theme-${state.theme || 'dark'}`;
+      soundToggle.checked = state.soundEnabled !== false;
+      particlesToggle.checked = state.particlesEnabled !== false;
+      document.querySelectorAll(".theme-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.theme === (state.theme || 'dark'));
       });
+      
+      const ppGoldenUnlock = prestigeUpgrades.find(p => p.id === "pp_golden_unlock");
+      const ppComboUnlock = prestigeUpgrades.find(p => p.id === "pp_combo_unlock");
+      
+      if ((ppGoldenUnlock && ppGoldenUnlock.level >= 1) || state.goldenUnlocked) {
+        state.goldenUnlocked = true;
+        goldenChanceDiv.style.display = "block";
+      }
+      
+      if ((ppComboUnlock && ppComboUnlock.level >= 1) || state.comboUnlocked) {
+        state.comboUnlocked = true;
+      }
+      
+      equipCosmetic(state.currentCosmetic);
+      
+      updateUI();
+      renderAchievements();
+      updateAscensionUI();
+      return true;
+    } catch (e) {
+      console.warn("Load failed", e);
+      return false;
     }
-    
-    if (payload.prestigeUpgrades) {
-      payload.prestigeUpgrades.forEach(pu => {
-        const u = prestigeUpgrades.find(x => x.id === pu.id);
-        if (u) {
-          u.level = pu.level ?? (pu.owned ? 1 : 0);
-          u.cost = pu.cost ?? u.baseCost;
-        }
-      });
-    }
-    
-    if (payload.achievements) {
-      payload.achievements.forEach(a => {
-        const ac = achievements.find(x => x.id === a.id);
-        if (ac) ac.unlocked = !!a.unlocked;
-      });
-    }
-    
-    if (!state.ownedCosmetics) state.ownedCosmetics = ['default'];
-    if (!state.currentCosmetic) state.currentCosmetic = 'default';
-    
-    document.body.className = `theme-${state.theme || 'dark'}`;
-    soundToggle.checked = state.soundEnabled !== false;
-    particlesToggle.checked = state.particlesEnabled !== false;
-    document.querySelectorAll(".theme-btn").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.theme === (state.theme || 'dark'));
-    });
-    
-    const ppGoldenUnlock = prestigeUpgrades.find(p => p.id === "pp_golden_unlock");
-    const ppComboUnlock = prestigeUpgrades.find(p => p.id === "pp_combo_unlock");
-    
-    if ((ppGoldenUnlock && ppGoldenUnlock.level >= 1) || state.goldenUnlocked) {
-      state.goldenUnlocked = true;
-      goldenChanceDiv.style.display = "block";
-    }
-    
-    if ((ppComboUnlock && ppComboUnlock.level >= 1) || state.comboUnlocked) {
-      state.comboUnlocked = true;
-    }
-    
-    equipCosmetic(state.currentCosmetic);
-    
-    updateUI();
-    renderAchievements();
-    updateAscensionUI();
-    
-    // Save to new key if we migrated
-    saveGame();
-    
-    return true;
-  } catch (e) {
-    console.warn("Load failed", e);
-    return false;
   }
-}
 
   function resetGame() {
     if (!confirm("Reset ALL progress including prestige and ascension?")) return;
@@ -1562,4 +1574,169 @@ function loadGame() {
       pushToast("🎁 Daily reward available!", 3000, "success");
     }
   }, 2000);
+  
+  // Bug spawn system
+  function spawnBug() {
+    if (activeBugs.length >= 3) return; // Max 3 bugs at once
+    
+    const bug = document.createElement("div");
+    bug.className = "bug-creature";
+    bug.textContent = "🪳";
+    
+    // Random starting position (edge of screen)
+    const edge = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
+    const maxX = window.innerWidth - 40;
+    const maxY = window.innerHeight - 40;
+    
+    let startX, startY, targetX, targetY;
+    
+    switch(edge) {
+      case 0: // top
+        startX = Math.random() * maxX;
+        startY = -40;
+        break;
+      case 1: // right
+        startX = window.innerWidth;
+        startY = Math.random() * maxY;
+        break;
+      case 2: // bottom
+        startX = Math.random() * maxX;
+        startY = window.innerHeight;
+        break;
+      case 3: // left
+        startX = -40;
+        startY = Math.random() * maxY;
+        break;
+    }
+    
+    // Random target position on screen
+    targetX = Math.random() * (maxX - 100) + 50;
+    targetY = Math.random() * (maxY - 100) + 50;
+    
+    bug.style.left = startX + "px";
+    bug.style.top = startY + "px";
+    
+    document.body.appendChild(bug);
+    
+    const bugData = {
+      element: bug,
+      startX,
+      startY,
+      targetX,
+      targetY,
+      progress: 0,
+      speed: 0.003, // Slower speed
+      alive: true,
+      escaping: false,
+      spawnTime: Date.now()
+    };
+    
+    activeBugs.push(bugData);
+    
+    // Click handler
+    bug.addEventListener("click", () => {
+      if (!bugData.alive) return;
+      bugData.alive = false;
+      
+      // Calculate reward based on game progress
+      const baseReward = Math.max(100, state.points * 0.01);
+      const reward = Math.floor(baseReward * (1 + Math.random()));
+      
+      state.points += reward;
+      state.totalPointsEarned += reward;
+      
+      bug.classList.add("bug-squished");
+      pushToast(`🪳 Squished! +${formatNumber(reward)}`, 2000, "success");
+      playBeep("golden");
+      
+      setTimeout(() => {
+        if (bug.parentNode) bug.parentNode.removeChild(bug);
+        activeBugs = activeBugs.filter(b => b !== bugData);
+      }, 400);
+      
+      updateUI();
+      saveGame();
+    });
+  }
+  
+  function updateBugs() {
+    const currentTime = Date.now();
+    
+    activeBugs.forEach(bugData => {
+      if (!bugData.alive) return;
+      
+      const timeAlive = (currentTime - bugData.spawnTime) / 1000; // seconds
+      
+      // After 5 seconds, start escaping
+      if (timeAlive >= 5 && !bugData.escaping) {
+        bugData.escaping = true;
+        
+        const currentX = bugData.startX + (bugData.targetX - bugData.startX) * bugData.progress;
+        const currentY = bugData.startY + (bugData.targetY - bugData.startY) * bugData.progress;
+        const maxX = window.innerWidth - 40;
+        const maxY = window.innerHeight - 40;
+        
+        const distToLeft = currentX;
+        const distToRight = maxX - currentX;
+        const distToTop = currentY;
+        const distToBottom = maxY - currentY;
+        
+        const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom);
+        
+        if (minDist === distToLeft) bugData.targetX = -40;
+        else if (minDist === distToRight) bugData.targetX = window.innerWidth;
+        else if (minDist === distToTop) bugData.targetY = -40;
+        else bugData.targetY = window.innerHeight;
+        
+        bugData.startX = currentX;
+        bugData.startY = currentY;
+        bugData.progress = 0;
+        bugData.speed = 0.003; // Same speed for escape
+      }
+      
+      bugData.progress += bugData.speed;
+      
+      // Update position
+      const x = bugData.startX + (bugData.targetX - bugData.startX) * bugData.progress;
+      const y = bugData.startY + (bugData.targetY - bugData.startY) * bugData.progress;
+      
+      bugData.element.style.left = x + "px";
+      bugData.element.style.top = y + "px";
+      
+      // Calculate angle for rotation
+      const dx = bugData.targetX - bugData.startX;
+      const dy = bugData.targetY - bugData.startY;
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      
+      // Rotate bug to face direction of movement
+      bugData.element.style.transform = `rotate(${angle + 90}deg)`;
+      
+      // Remove if off screen
+      if (x < -50 || x > window.innerWidth + 50 || y < -50 || y > window.innerHeight + 50) {
+        if (bugData.element.parentNode) {
+          bugData.element.parentNode.removeChild(bugData.element);
+        }
+        activeBugs = activeBugs.filter(b => b !== bugData);
+      }
+    });
+  }
+  
+  // Start bug spawn timer
+  function startBugSpawns() {
+    bugSpawnTimer = setInterval(() => {
+      const chance = .15; // 15% chance every 10 seconds
+      if (Math.random() < chance) {
+        spawnBug();
+      }
+    }, 10000);
+  }
+  
+  // Animation loop for bugs
+  function bugAnimationLoop() {
+    updateBugs();
+    requestAnimationFrame(bugAnimationLoop);
+  }
+  
+  startBugSpawns();
+  bugAnimationLoop();
 });
