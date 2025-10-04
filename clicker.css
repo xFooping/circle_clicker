@@ -1,4 +1,4 @@
-/* Extended styling—keeps previous look and adds achievements/prestige/ascension UI */
+/* Extended styling—keeps previous look and adds achievements/prestige/ascension UI + cosmetics */
 :root{
   --bg: #0f1720;
   --panel: #0b1220;
@@ -8,6 +8,7 @@
   --success: #10b981;
   --shadow: 0 8px 30px rgba(2,6,23,0.6);
   --glass: rgba(255,255,255,0.03);
+  --circle-color: radial-gradient(circle at 30% 20%, #7bd0ff, #06b6d4 30%, #04718b 100%);
 }
 
 /* Theme variations */
@@ -32,12 +33,12 @@ button:active{transform:translateY(0)}
 .app{display:flex;gap:24px}
 .play-area{flex:1;display:flex;flex-direction:column;align-items:center;gap:16px;padding:28px;background:var(--glass);border-radius:16px;box-shadow:var(--shadow);min-height:500px;position:relative}
 .shop{width:480px;background:var(--panel);padding:20px;border-radius:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:16px}
-.shop h2{margin:0;color:var(--muted);font-size:20px}
+.shop h2{margin:0 0 12px 0;color:var(--muted);font-size:20px;text-align:center}
 .shop h3{margin:0 0 16px 0;font-size:20px}
-.shop-top{display:flex;justify-content:space-between;align-items:center}
+.shop-top{display:flex;flex-direction:column;gap:12px;align-items:center}
 
 /* tabs */
-.tabs{display:flex;gap:10px;flex-wrap:wrap}
+.tabs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .tab-btn{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.02);padding:10px 14px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600}
 .tab-btn.active{background:var(--accent);color:#022029}
 
@@ -59,7 +60,7 @@ button:active{transform:translateY(0)}
 /* circle */
 #circle{
   width:220px;height:220px;border-radius:50%;
-  background: radial-gradient(circle at 30% 20%, #7bd0ff, #06b6d4 30%, #04718b 100%);
+  background: var(--circle-color);
   display:flex;align-items:center;justify-content:center;color:#022029;font-size:56px;font-weight:800;
   cursor:pointer;user-select:none;box-shadow: 0 12px 40px rgba(0,0,0,0.6), inset 0 -10px 30px rgba(0,0,0,0.12);
   transition: transform .08s ease, box-shadow .08s ease;
@@ -69,6 +70,23 @@ button:active{transform:translateY(0)}
 #circle:focus{ outline: 4px solid rgba(6,182,212,0.12); outline-offset:6px; border-radius:50% }
 #circle.golden{ background: radial-gradient(circle at 30% 20%, #ffd700, #ffb700 30%, #ff8c00 100%); animation: pulse 0.5s ease-in-out; }
 #circle.combo-active{ box-shadow: 0 12px 40px rgba(255,215,0,0.6), inset 0 -10px 30px rgba(255,215,0,0.12); }
+
+/* Circle color classes */
+#circle.circle-crimson{
+  --circle-color: radial-gradient(circle at 30% 20%, #ff6b9d, #dc2626 30%, #7f1d1d 100%);
+}
+#circle.circle-emerald{
+  --circle-color: radial-gradient(circle at 30% 20%, #6ee7b7, #10b981 30%, #065f46 100%);
+}
+#circle.circle-violet{
+  --circle-color: radial-gradient(circle at 30% 20%, #c4b5fd, #8b5cf6 30%, #5b21b6 100%);
+}
+#circle.circle-amber{
+  --circle-color: radial-gradient(circle at 30% 20%, #fcd34d, #f59e0b 30%, #b45309 100%);
+}
+#circle.circle-secret{
+  --circle-color: radial-gradient(circle at 30% 20%, #d1d5db, #6b7280 30%, #374151 100%);
+}
 
 /* pop animation class */
 .pop {
@@ -112,6 +130,10 @@ button:active{transform:translateY(0)}
   border:1px solid rgba(251,191,36,0.3);
   background:linear-gradient(180deg, rgba(251,191,36,0.05), rgba(0,0,0,0.03));
 }
+.upgrade-card.cosmetic-upgrade{
+  border:1px solid rgba(236,72,153,0.3);
+  background:linear-gradient(180deg, rgba(236,72,153,0.05), rgba(0,0,0,0.03));
+}
 .upgrade-card .row{display:flex;width:100%;justify-content:space-between;align-items:center}
 .upgrade-title{font-weight:700;font-size:17px}
 .upgrade-desc{font-size:15px;color:var(--muted);line-height:1.4}
@@ -141,11 +163,20 @@ button:active{transform:translateY(0)}
 .ascension-panel.locked{opacity:0.6;border:1px solid rgba(255,255,255,0.1)}
 .ascension-actions{display:flex;gap:12px;flex-wrap:wrap}
 
+/* cosmetics panel */
+.cosmetics-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.cosmetic-preview{width:80px;height:80px;border-radius:50%;margin:0 auto 8px auto}
+
 /* stats panel */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:15px}
 .stat-item{padding:14px;background:rgba(255,255,255,0.02);border-radius:8px}
 .stat-label{color:var(--muted);font-size:13px;text-transform:uppercase;margin-bottom:6px}
 .stat-value{font-weight:700;font-size:20px;color:var(--accent)}
+
+/* boost stats */
+.boost-stats{padding:14px;background:rgba(255,255,255,0.02);border-radius:8px;margin-top:12px;font-size:14px}
+.boost-stats-title{color:var(--muted);font-size:13px;text-transform:uppercase;margin-bottom:8px}
+.boost-value{font-weight:700;font-size:18px;color:var(--success)}
 
 /* settings panel */
 .settings-grid{display:flex;flex-direction:column;gap:14px}
@@ -153,6 +184,20 @@ button:active{transform:translateY(0)}
 .theme-selector{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
 .theme-btn{padding:16px;border-radius:10px;border:2px solid transparent;cursor:pointer;font-size:14px;text-align:center;background:rgba(255,255,255,0.02);font-weight:600}
 .theme-btn.active{border-color:var(--accent)}
+
+/* secret button */
+#secret-cosmetic-btn{
+  position:absolute;
+  bottom:10px;
+  left:10px;
+  width:20px;
+  height:20px;
+  background:transparent;
+  border:none;
+  cursor:pointer;
+  opacity:0;
+  padding:0;
+}
 
 /* minigame panel */
 .minigame-panel{padding:16px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.03));border-radius:10px;margin-bottom:16px}
@@ -464,7 +509,7 @@ button:active{transform:translateY(0)}
 /* modal */
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:10000;align-items:center;justify-content:center}
 .modal.active{display:flex}
-.modal-content{background:var(--panel);padding:28px;border-radius:16px;max-width:550px;width:90%;max-height:80vh;overflow-y:auto}
+.modal-content{background:var(--panel);padding:28px;border-radius:16px;max-width:550px;width:90%;max-height:80vh;overflow-y:auto;position:relative}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
 .modal-header h3{margin:0;font-size:24px}
 .modal-close{background:transparent;color:var(--muted);font-size:32px;padding:4px 12px;cursor:pointer}
