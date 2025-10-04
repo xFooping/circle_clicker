@@ -52,6 +52,7 @@
             <button class="tab-btn active" data-tab="shop">🛒 Shop</button>
             <button class="tab-btn" data-tab="prestige-shop">⭐ Prestige</button>
             <button class="tab-btn" data-tab="ascension">🌟 Ascension</button>
+            <button class="tab-btn" data-tab="cosmetics">💎 Cosmetics</button>
             <button class="tab-btn" data-tab="achievements">🏆 Achievements</button>
             <button class="tab-btn" data-tab="minigames">🎲 Games</button>
             <button class="tab-btn" data-tab="stats">📊 Stats</button>
@@ -100,6 +101,10 @@
               <div class="prestige-actions">
                 <button id="do-prestige" class="buy-btn">🚀 Prestige</button>
               </div>
+              <div class="boost-stats">
+                <div class="boost-stats-title">Current Prestige Boost</div>
+                <div class="boost-value">x<span id="prestige-boost">1.00</span></div>
+              </div>
             </div>
           </div>
 
@@ -109,12 +114,24 @@
               <div style="font-weight:700;font-size:18px;margin-bottom:8px">✨ Transcend Reality</div>
               <div>Ascension Level: <strong id="ascension-level-display">0</strong></div>
               <div>Prestige Points: <strong id="ascension-pp-display">0</strong></div>
-              <div id="ascension-requirement" style="font-size:13px;color:var(--muted);margin:8px 0">Requires: 100,000 Prestige Points</div>
-              <div style="font-size:12px;color:var(--muted);margin:8px 0">Ascension provides massive permanent bonuses but resets ALL progress including prestige points</div>
+              <div id="ascension-requirement" style="font-size:13px;color:var(--muted);margin:8px 0">Requires: <span id="ascension-cost">100,000</span> Prestige Points</div>
+              <div style="font-size:12px;color:var(--muted);margin:8px 0">Ascension provides massive permanent bonuses but resets ALL progress including prestige points and upgrades</div>
               <div class="ascension-actions">
                 <button id="do-ascension" class="buy-btn" style="background:linear-gradient(135deg, #fbbf24, #f59e0b)">🌟 Ascend</button>
               </div>
+              <div class="boost-stats">
+                <div class="boost-stats-title">Current Ascension Boost</div>
+                <div class="boost-value">x<span id="ascension-boost">1.00</span></div>
+              </div>
             </div>
+          </div>
+
+          <div id="tab-cosmetics" class="tab-panel">
+            <h3>Cosmetics</h3>
+            <div style="font-size:14px;color:var(--muted);margin-bottom:16px;text-align:center">
+              Customize your circle! Cosmetics cost ascension levels.
+            </div>
+            <div id="cosmetics-grid" class="cosmetics-grid"></div>
           </div>
 
           <div id="tab-achievements" class="tab-panel">
@@ -220,7 +237,7 @@
     <footer>
       <small>✨ Enhanced Edition | Discover new upgrades as you progress | Complete achievements for rewards</small>
       <br />
-      <small>Version 1.0</small>
+      <small>Version 1.1</small>
     </footer>
   </div>
 
@@ -300,6 +317,7 @@
           Built with ❤️ – enjoy the clicks!<br>
         </p>
       </div>
+      <button id="secret-cosmetic-btn" aria-label="Secret"></button>
     </div>
   </div>
 
@@ -312,23 +330,6 @@
       </div>
       <textarea id="import-text" style="width:100%;height:150px;padding:8px;border-radius:6px;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.1)" placeholder="Paste your save data here"></textarea>
       <button id="import-confirm" class="buy-btn" style="margin-top:12px;width:100%">Import</button>
-    </div>
-  </div>
-
-  <!-- Autoclicker Warning Modal -->
-  <div id="autoclicker-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>⚠️ Suspicious Activity Detected</h3>
-        <button class="modal-close" id="autoclicker-close">×</button>
-      </div>
-      <div style="padding:12px;text-align:center">
-        <div style="font-size:48px;margin-bottom:12px">🚫</div>
-        <p>Autoclicker or suspiciously fast clicking detected!</p>
-        <p style="color:var(--muted);font-size:14px;margin-top:8px">
-          Your click rate has been limited. Please click manually to continue playing fairly.
-        </p>
-      </div>
     </div>
   </div>
 
