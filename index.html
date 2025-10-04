@@ -33,13 +33,34 @@
         <div id="circle" aria-label="Points" tabindex="0"></div>
 
         <div class="hud">
-          <div>Points: <span id="points-display">0</span></div>
-          <div>Click Power: <span id="click-display">1</span></div>
-          <div>Idle: <span id="idle-display">0</span>/s</div>
-          <div>Multiplier: x<span id="mult-display">1</span></div>
-          <div>Prestige Points: <strong id="prestige-points">0</strong></div>
-          <div>Ascension Level: <strong id="ascension-level">0</strong></div>
-          <div id="golden-chance" style="color:#ffd700;font-size:12px;display:none">⭐ Golden: <span id="golden-pct">0</span>%</div>
+          <div class="hud-stat highlight">
+            <div class="hud-label">Points</div>
+            <div class="hud-value" id="points-display">0</div>
+          </div>
+          <div class="hud-stat">
+            <div class="hud-label">Click Power</div>
+            <div class="hud-value" id="click-display">1</div>
+          </div>
+          <div class="hud-stat">
+            <div class="hud-label">Idle</div>
+            <div class="hud-value"><span id="idle-display">0</span>/s</div>
+          </div>
+          <div class="hud-stat">
+            <div class="hud-label">Multiplier</div>
+            <div class="hud-value">x<span id="mult-display">1</span></div>
+          </div>
+          <div class="hud-stat wide">
+            <div class="hud-label">Prestige Points</div>
+            <div class="hud-value" id="prestige-points">0</div>
+          </div>
+          <div class="hud-stat wide">
+            <div class="hud-label">Ascension Level</div>
+            <div class="hud-value" id="ascension-level">0</div>
+          </div>
+          <div class="hud-stat wide golden" id="golden-chance" style="display:none">
+            <div class="hud-label">Golden Chance</div>
+            <div class="hud-value" style="color:#ffd700"><span id="golden-pct">0</span>%</div>
+          </div>
         </div>
 
         <div id="particle-layer" aria-hidden="true"></div>
@@ -235,9 +256,9 @@
     </main>
 
     <footer>
-      <small>✨ Enhanced Edition | Discover new upgrades as you progress | Complete achievements for rewards</small>
+      <small>Prestige and Ascend | Discover new upgrades as you progress | Squish Bugs</small>
       <br />
-      <small>Version 1.1</small>
+      <small>Version 1.2</small>
     </footer>
   </div>
 
@@ -306,7 +327,7 @@
   <div id="credits-modal" class="modal" aria-hidden="true">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>🎖️ Credits – Version 1.1</h3>
+        <h3>🎖️ Credits – Version 1.2</h3>
         <button class="modal-close" id="credits-close">×</button>
       </div>
 
