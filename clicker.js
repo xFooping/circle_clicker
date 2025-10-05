@@ -1,5 +1,5 @@
-// Enhanced clicker.js - WITH TRANSCENSION & BULK BUYING
-const SAVE_KEY = "clickerSave_v8";
+// Enhanced clicker.js - WITH ARTIFACTS SYSTEM AND ALL FIXES
+const SAVE_KEY = "clickerSave_v10";
 const AUTOSAVE_INTERVAL_MS = 60000;
 const PRESTIGE_BASE = 1e6;
 const PRESTIGE_MULT_PER_POINT = 0.05;
@@ -8,12 +8,13 @@ const TRANSCENSION_REQUIREMENT = 30;
 const COMBO_TIMEOUT = 2000;
 const COMBO_THRESHOLD = 5;
 const MAX_COMBO_LEVEL = 20;
+const ARTIFACT_SHARD_CHANCE = 0.00001; // 1 in 100,000
 
 let state = {
   points: 0,
   clickPower: 1,
   multiplier: 1,
-  version: 8,
+  version: 10,
   totalClicks: 0,
   totalPointsEarned: 0,
   totalUpgradesBought: 0,
@@ -29,8 +30,10 @@ let state = {
   playTime: 0,
   theme: 'dark',
   soundEnabled: true,
-  musicEnabled: false,
   particlesEnabled: true,
+  toastsEnabled: true,
+  bugToastEnabled: true,
+  goldenToastEnabled: true,
   lastDailyReward: 0,
   dailyStreak: 0,
   goldenUnlocked: false,
@@ -38,16 +41,58 @@ let state = {
   currentCosmetic: 'default',
   ownedCosmetics: ['default'],
   bulkBuyAmount: 1,
+  artifactShards: 0,
+  artifactsDiscovered: false,
+  unlockedArtifacts: [],
+  prestigePointsDiscovered: false,
+  ascensionLevelDiscovered: false,
+  transcensionTokensDiscovered: false,
 };
 
 const COSMETICS = [
   { id: 'default', name: 'Classic Cyan', className: '', cost: 0, costType: 'free', desc: 'The original circle' },
-  { id: 'galaxy', name: 'Galaxy Spiral', className: 'circle-galaxy', cost: 5, costType: 'ascension', desc: 'A cosmic galaxy swirl', isImage: true },
   { id: 'emerald', name: 'Emerald Dream', className: 'circle-emerald', cost: 5, costType: 'ascension', desc: 'A verdant green circle' },
   { id: 'violet', name: 'Violet Storm', className: 'circle-violet', cost: 5, costType: 'ascension', desc: 'A mystical purple circle' },
   { id: 'amber', name: 'Amber Glow', className: 'circle-amber', cost: 5, costType: 'ascension', desc: 'A golden amber circle' },
+  { id: 'galaxy', name: 'Galaxy Spiral', className: 'circle-galaxy', cost: 25, costType: 'ascension', desc: 'A cosmic galaxy swirl', isImage: true },
   { id: 'secret', name: '???', className: 'circle-secret', cost: 0, costType: 'secret', desc: 'How did you find this?', secret: true },
 ];
+
+const ARTIFACTS = [
+  // Common (5)
+  { id: 'pottery', name: 'Ancient Pottery', rarity: 'common', icon: '🏺', desc: 'A weathered clay pot' },
+  { id: 'coin', name: 'Old Coin', rarity: 'common', icon: '🪙', desc: 'A tarnished copper coin' },
+  { id: 'scroll', name: 'Torn Scroll', rarity: 'common', icon: '📜', desc: 'Faded ancient writings' },
+  { id: 'bone', name: 'Fossil Fragment', rarity: 'common', icon: '🦴', desc: 'Prehistoric remains' },
+  { id: 'shell', name: 'Pearl Shell', rarity: 'common', icon: '🐚', desc: 'An iridescent seashell' },
+  
+  // Rare (5)
+  { id: 'statue', name: 'Stone Statue', rarity: 'rare', icon: '🗿', desc: 'A mysterious carved figure' },
+  { id: 'gem', name: 'Gemstone', rarity: 'rare', icon: '💎', desc: 'A brilliant cut jewel' },
+  { id: 'mask', name: 'Ritual Mask', rarity: 'rare', icon: '🎭', desc: 'An ornate ceremonial mask' },
+  { id: 'compass', name: 'Golden Compass', rarity: 'rare', icon: '🧭', desc: 'Always points true' },
+  { id: 'hourglass', name: 'Crystal Hourglass', rarity: 'rare', icon: '⏳', desc: 'Time flows differently' },
+  
+  // Legendary (3)
+  { id: 'crown', name: 'Royal Crown', rarity: 'legendary', icon: '👑', desc: 'Worn by ancient kings' },
+  { id: 'sword', name: 'Legendary Blade', rarity: 'legendary', icon: '⚔️', desc: 'Forged in dragon fire' },
+  { id: 'orb', name: 'Crystal Orb', rarity: 'legendary', icon: '🔮', desc: 'Sees all possible futures' },
+  
+  // Mythic (2)
+  { id: 'phoenix', name: 'Phoenix Feather', rarity: 'mythic', icon: '🪶', desc: 'Burns with eternal flame' },
+  { id: 'star', name: 'Fallen Star', rarity: 'mythic', icon: '⭐', desc: 'A fragment of the cosmos' },
+  
+  // Eternal (1)
+  { id: 'infinity', name: 'Infinity Stone', rarity: 'eternal', icon: '💠', desc: 'Contains the power of eternity itself' },
+];
+
+const RARITY_CHANCES = {
+  common: 0.50,
+  rare: 0.30,
+  legendary: 0.15,
+  mythic: 0.04,
+  eternal: 0.01
+};
 
 const UPGRADES = [
   { id: "idle1", name: "Idle Worker", desc: "+0.5 points/sec", baseCost: 100, costMult: 1.8, type: "idle", effect: 0.5, category: "workers", unlockAfter: null },
@@ -56,9 +101,9 @@ const UPGRADES = [
   { id: "idle3", name: "Mega Generator", desc: "+10 points/sec", baseCost: 25000, costMult: 1.8, type: "idle", effect: 10, category: "workers", unlockAfter: 12 },
   { id: "click1", name: "Better Cursor", desc: "+1 click power", baseCost: 50, costMult: 1.9, type: "click", effect: 1, category: "clicks", unlockAfter: null },
   { id: "click2", name: "Super Cursor", desc: "+3 click power", baseCost: 3000, costMult: 2.0, type: "click", effect: 3, category: "clicks", unlockAfter: 8 },
-  { id: "combo1", name: "Combo Master", desc: "Unlock combo system (click fast for bonus)", baseCost: 150000, costMult: 999, type: "special_combo", effect: 1, category: "clicks", unlockAfter: 15, oneTime: true },
-  { id: "combo_upgrade", name: "Combo Limit +50", desc: "Increase max combo by 50", baseCost: 250000, costMult: 2.5, type: "combo_limit", effect: 50, category: "clicks", unlockAfter: 18 },
-  { id: "golden1", name: "Golden Touch", desc: "Unlock golden clicks (5% chance for 10x)", baseCost: 100000, costMult: 999, type: "special_golden", effect: 0.05, category: "clicks", unlockAfter: 15, oneTime: true },
+  { id: "combo1", name: "Combo Master", desc: "Unlock combo system (click fast for bonus)", baseCost: 150000, costMult: 999, type: "special_combo", effect: 1, category: "clicks", unlockAfter: 15, oneTime: true, maxLevel: 1 },
+  { id: "combo_upgrade", name: "Combo Limit +50", desc: "Increase max combo by 50", baseCost: 250000, costMult: 2.5, type: "combo_limit", effect: 50, category: "clicks", unlockAfter: 18, maxLevel: 20 },
+  { id: "golden1", name: "Golden Touch", desc: "Unlock golden clicks (5% chance for 10x)", baseCost: 100000, costMult: 999, type: "special_golden", effect: 0.05, category: "clicks", unlockAfter: 15, oneTime: true, maxLevel: 1 },
   { id: "golden2", name: "Golden Boost", desc: "+5% golden click chance", baseCost: 500000, costMult: 3.5, type: "special", effect: 0.05, category: "clicks", unlockAfter: 18 },
   { id: "multi1", name: "Multiplier", desc: "x1.15 global multiplier", baseCost: 500, costMult: 2.5, type: "multi", effect: 1.15, category: "multipliers", unlockAfter: 5 },
   { id: "multi2", name: "Big Multiplier", desc: "x1.3 global multiplier", baseCost: 50000, costMult: 2.8, type: "multi", effect: 1.3, category: "multipliers", unlockAfter: 12 },
@@ -68,10 +113,10 @@ const PRESTIGE_UPGRADES = [
   { id: "pp_click", name: "Eternal Click", desc: "Start with +10 click power per level", baseCost: 1, costMult: 5.0, type: "start_click", effect: 10, oneTime: false },
   { id: "pp_idle", name: "Eternal Idle", desc: "Start with +10 idle/sec per level", baseCost: 1, costMult: 5.0, type: "start_idle", effect: 10, oneTime: false },
   { id: "pp_multi", name: "Eternal Multi", desc: "Permanent x1.5 multiplier per level", baseCost: 2, costMult: 8.0, type: "permanent_multi", effect: 1.5, oneTime: false },
-  { id: "pp_golden_unlock", name: "Golden Touch", desc: "Unlock golden clicks permanently", baseCost: 5, costMult: 999, type: "golden_unlock", effect: 1, oneTime: true },
-  { id: "pp_combo_unlock", name: "Combo Master", desc: "Unlock combo system permanently", baseCost: 5, costMult: 999, type: "combo_unlock", effect: 1, oneTime: true },
-  { id: "pp_golden", name: "Golden Blessing", desc: "+10% golden click chance", baseCost: 10, costMult: 999, type: "golden_boost", effect: 0.1, oneTime: true },
-  { id: "pp_offline", name: "Offline Bonus", desc: "2x offline progress", baseCost: 20, costMult: 999, type: "offline_boost", effect: 2, oneTime: true },
+  { id: "pp_golden_unlock", name: "Golden Touch", desc: "Unlock golden clicks permanently", baseCost: 5, costMult: 999, type: "golden_unlock", effect: 1, oneTime: true, maxLevel: 1 },
+  { id: "pp_combo_unlock", name: "Combo Master", desc: "Unlock combo system permanently", baseCost: 5, costMult: 999, type: "combo_unlock", effect: 1, oneTime: true, maxLevel: 1 },
+  { id: "pp_golden", name: "Golden Blessing", desc: "+10% golden click chance", baseCost: 10, costMult: 999, type: "golden_boost", effect: 0.1, oneTime: true, maxLevel: 1 },
+  { id: "pp_offline", name: "Offline Bonus", desc: "2x offline progress", baseCost: 20, costMult: 999, type: "offline_boost", effect: 2, oneTime: true, maxLevel: 1 },
 ];
 
 const ACHIEVEMENTS = [
@@ -91,6 +136,7 @@ const ACHIEVEMENTS = [
   { id: "prestige1", name: "Ascended", desc: "Prestige once", check: () => state.totalPrestiges >= 1, reward: { type: "points", amount: 50000 } },
   { id: "prestige5", name: "Veteran", desc: "Prestige 5 times", check: () => state.totalPrestiges >= 5, reward: { type: "prestigePoints", amount: 5 } },
   { id: "daily7", name: "Dedicated", desc: "7 day streak", check: () => state.dailyStreak >= 7, reward: { type: "prestigePoints", amount: 2 }, secret: false },
+  { id: "artifact1", name: "Archaeologist", desc: "Find your first artifact shard", check: () => state.artifactShards >= 1, reward: { type: "points", amount: 100000 } },
   { id: "secret1", name: "???", desc: "Hidden achievement", unlockName: "Speed Demon", unlockDesc: "Click 10,000 times total", check: () => state.totalClicks >= 10000, reward: { type: "prestigePoints", amount: 10 }, secret: true },
   { id: "secret2", name: "???", desc: "Hidden achievement", unlockName: "Trillionaire", unlockDesc: "Reach 1 trillion points", check: () => state.points >= 1e12, reward: { type: "prestigePoints", amount: 15 }, secret: true },
 ];
@@ -104,7 +150,6 @@ let comboTimer = null;
 let goldenActive = false;
 let activeBugs = [];
 let bugSpawnTimer = null;
-let backgroundMusic = null;
 
 function trimTrailingZeros(str) {
   return str.replace(/(\.\d*?[1-9])0+$/,'$1').replace(/\.0+$/,'');
@@ -194,8 +239,15 @@ function calcClickPower() {
   }
   
   const prestigeMult = (1 + (state.prestigePoints || 0) * PRESTIGE_MULT_PER_POINT);
+  
+  // FIXED: Correct combo calculation
   const comboLimit = getComboLimit();
-  const comboMult = (state.comboUnlocked && comboCount >= COMBO_THRESHOLD) ? (1 + Math.min(comboCount - COMBO_THRESHOLD + 1, comboLimit - COMBO_THRESHOLD + 1) * 0.5) : 1;
+  let comboMult = 1;
+  if (state.comboUnlocked && comboCount >= COMBO_THRESHOLD) {
+    const comboBonus = Math.min(comboCount, comboLimit) - COMBO_THRESHOLD + 1;
+    comboMult = 1 + (comboBonus * 0.5);
+  }
+  
   const ascensionMult = getAscensionMultiplier();
   
   return base * mult * prestigeMult * comboMult * ascensionMult;
@@ -220,7 +272,25 @@ function isUpgradeUnlocked(upgrade) {
   return state.totalUpgradesBought >= upgrade.unlockAfter;
 }
 
+function shouldHideUpgrade(upgrade) {
+  // Hide Golden Touch if permanent version is owned
+  if (upgrade.id === "golden1") {
+    const ppGoldenUnlock = prestigeUpgrades.find(p => p.id === "pp_golden_unlock");
+    if (ppGoldenUnlock && ppGoldenUnlock.level >= 1) return true;
+  }
+  
+  // Hide Combo Master if permanent version is owned
+  if (upgrade.id === "combo1") {
+    const ppComboUnlock = prestigeUpgrades.find(p => p.id === "pp_combo_unlock");
+    if (ppComboUnlock && ppComboUnlock.level >= 1) return true;
+  }
+  
+  return false;
+}
+
 function pushToast(text, ttl = 2200, type = "") {
+  if (!state.toastsEnabled) return;
+  
   const toastLayer = document.getElementById("toast-layer");
   if (!toastLayer) return;
   const t = document.createElement("div");
@@ -231,6 +301,26 @@ function pushToast(text, ttl = 2200, type = "") {
     t.style.opacity = "0";
     setTimeout(() => { if (t.parentNode) t.parentNode.removeChild(t); }, 420);
   }, ttl);
+}
+
+function rollArtifact() {
+  const rand = Math.random();
+  let cumulative = 0;
+  
+  for (const [rarity, chance] of Object.entries(RARITY_CHANCES)) {
+    cumulative += chance;
+    if (rand <= cumulative) {
+      const artifactsOfRarity = ARTIFACTS.filter(a => a.rarity === rarity && !state.unlockedArtifacts.includes(a.id));
+      if (artifactsOfRarity.length === 0) {
+        const allOfRarity = ARTIFACTS.filter(a => a.rarity === rarity);
+        return allOfRarity[Math.floor(Math.random() * allOfRarity.length)];
+      }
+      return artifactsOfRarity[Math.floor(Math.random() * artifactsOfRarity.length)];
+    }
+  }
+  
+  const commonArtifacts = ARTIFACTS.filter(a => a.rarity === 'common');
+  return commonArtifacts[Math.floor(Math.random() * commonArtifacts.length)];
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -289,6 +379,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const transcensionBoostEl = document.getElementById("transcension-boost");
   const transcensionTabBtn = document.getElementById("transcension-tab-btn");
 
+  const artifactSideSection = document.getElementById("artifact-side-section");
+  const artifactShardsSide = document.getElementById("artifact-shards-side");
+
   const dailyBtn = document.getElementById("daily-btn");
   const dailyModal = document.getElementById("daily-modal");
   const dailyClose = document.getElementById("daily-close");
@@ -307,6 +400,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const guessBtn = document.getElementById("guess-btn");
   const guessInput = document.getElementById("guess-input");
 
+  // Side panel modals
+  const cosmeticsModal = document.getElementById("cosmetics-modal");
+  const cosmeticsClose = document.getElementById("cosmetics-close");
+  const achievementsModal = document.getElementById("achievements-modal");
+  const achievementsClose = document.getElementById("achievements-close");
+  const statsModal = document.getElementById("stats-modal");
+  const statsClose = document.getElementById("stats-close");
+  const settingsModal = document.getElementById("settings-modal");
+  const settingsClose = document.getElementById("settings-close");
+  
+  // Artifacts modals
+  const artifactsModal = document.getElementById("artifacts-modal");
+  const artifactsClose = document.getElementById("artifacts-close");
+  const buyScratchoffBtn = document.getElementById("buy-scratchoff");
+  const openMuseumBtn = document.getElementById("open-museum");
+  const scratchoffFullscreen = document.getElementById("scratchoff-fullscreen");
+  const closeScratchoffBtn = document.getElementById("close-scratchoff");
+  const museumFullscreen = document.getElementById("museum-fullscreen");
+  const closeMuseumBtn = document.getElementById("close-museum");
+
   const blackjackFullscreen = document.getElementById("blackjack-fullscreen");
   const openBlackjackBtn = document.getElementById("open-blackjack");
   const closeBlackjackBtn = document.getElementById("close-blackjack");
@@ -324,10 +437,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const blackjackResult = document.getElementById("blackjack-result");
 
   const soundToggle = document.getElementById("sound-toggle");
-  const musicToggle = document.getElementById("music-toggle");
   const particlesToggle = document.getElementById("particles-toggle");
-
-  let blackjackState = {
+  const toastsToggle = document.getElementById("toasts-toggle");
+  const bugToastToggle = document.getElementById("bug-toast-toggle");
+  const goldenToastToggle = document.getElementById("golden-toast-toggle");let blackjackState = {
     deck: [],
     playerHand: [],
     dealerHand: [],
@@ -335,6 +448,36 @@ document.addEventListener("DOMContentLoaded", () => {
     gameActive: false,
     dealerRevealed: false
   };
+
+  // Side panel button handlers
+  document.querySelectorAll(".side-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.sidetab;
+      
+      if (tab === "cosmetics") {
+        cosmeticsModal.classList.add("active");
+        renderCosmetics();
+      } else if (tab === "achievements") {
+        achievementsModal.classList.add("active");
+        renderAchievements();
+      } else if (tab === "stats") {
+        statsModal.classList.add("active");
+        updateStatsModal();
+      } else if (tab === "settings") {
+        settingsModal.classList.add("active");
+      } else if (tab === "artifacts") {
+        artifactsModal.classList.add("active");
+        updateArtifactsModal();
+      }
+    });
+  });
+
+  // Close modal handlers
+  if (cosmeticsClose) cosmeticsClose.addEventListener("click", () => cosmeticsModal.classList.remove("active"));
+  if (achievementsClose) achievementsClose.addEventListener("click", () => achievementsModal.classList.remove("active"));
+  if (statsClose) statsClose.addEventListener("click", () => statsModal.classList.remove("active"));
+  if (settingsClose) settingsClose.addEventListener("click", () => settingsModal.classList.remove("active"));
+  if (artifactsClose) artifactsClose.addEventListener("click", () => artifactsModal.classList.remove("active"));
 
   // Bulk buy functionality
   document.querySelectorAll(".bulk-btn").forEach(btn => {
@@ -357,6 +500,219 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Artifacts functionality
+  buyScratchoffBtn.addEventListener("click", () => {
+    if (state.artifactShards < 3) {
+      pushToast("Need 3 Artifact Shards!");
+      return;
+    }
+    
+    state.artifactShards -= 3;
+    artifactsModal.classList.remove("active");
+    openScratchoff();
+    updateUI();
+    saveGame();
+  });
+
+  openMuseumBtn.addEventListener("click", () => {
+    artifactsModal.classList.remove("active");
+    openMuseum();
+  });
+
+  closeScratchoffBtn.addEventListener("click", () => {
+    scratchoffFullscreen.classList.remove("active");
+  });
+
+  closeMuseumBtn.addEventListener("click", () => {
+    museumFullscreen.classList.remove("active");
+  });
+
+  function openScratchoff() {
+    scratchoffFullscreen.classList.add("active");
+    
+    const canvas = document.getElementById("scratchoff-canvas");
+    const ctx = canvas.getContext("2d");
+    const resultDiv = document.getElementById("scratchoff-result");
+    
+    resultDiv.classList.remove("show", "common", "rare", "legendary", "mythic", "eternal");
+    resultDiv.textContent = "";
+    
+    const artifact = rollArtifact();
+    const isNew = !state.unlockedArtifacts.includes(artifact.id);
+    
+    // Draw scratch-off covering
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Add texture pattern
+    for (let i = 0; i < 50; i++) {
+      ctx.fillStyle = `rgba(${120 + Math.random() * 60}, ${120 + Math.random() * 60}, ${120 + Math.random() * 60}, 0.3)`;
+      ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 20, 20);
+    }
+    
+    ctx.font = "bold 24px Inter";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.fillText("SCRATCH TO REVEAL", canvas.width / 2, canvas.height / 2 - 20);
+    ctx.font = "20px Inter";
+    ctx.fillText("✨ ARTIFACT ✨", canvas.width / 2, canvas.height / 2 + 20);
+    
+    let isScratching = false;
+    let scratchedPixels = 0;
+    const totalPixels = canvas.width * canvas.height;
+    
+    function scratch(x, y) {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath();
+      ctx.arc(x, y, 30, 0, Math.PI * 2);
+      ctx.fill();
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let transparent = 0;
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (imageData.data[i] === 0) transparent++;
+      }
+      
+      scratchedPixels = transparent;
+      
+      if (scratchedPixels / totalPixels > 0.6) {
+        revealArtifact();
+      }
+    }
+    
+    function revealArtifact() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw artifact reveal
+      ctx.globalCompositeOperation = "source-over";
+      
+      // Background gradient based on rarity
+      const gradients = {
+        common: ["#9ca3af", "#6b7280"],
+        rare: ["#3b82f6", "#1e40af"],
+        legendary: ["#a855f7", "#7c3aed"],
+        mythic: ["#fbbf24", "#f59e0b"],
+        eternal: ["#ec4899", "#a855f7"]
+      };
+      
+      const [color1, color2] = gradients[artifact.rarity];
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, color1);
+      gradient.addColorStop(1, color2);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw artifact icon
+      ctx.font = "120px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(artifact.icon, canvas.width / 2, canvas.height / 2 - 40);
+      
+      // Draw artifact name
+      ctx.font = "bold 28px Inter";
+      ctx.fillStyle = "#fff";
+      ctx.fillText(artifact.name, canvas.width / 2, canvas.height / 2 + 80);
+      
+      // Draw rarity
+      ctx.font = "bold 18px Inter";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.fillText(artifact.rarity.toUpperCase(), canvas.width / 2, canvas.height / 2 + 115);
+      
+      // Add to unlocked artifacts if new
+      if (isNew) {
+        state.unlockedArtifacts.push(artifact.id);
+        resultDiv.textContent = `🎉 NEW! ${artifact.name} - ${artifact.desc}`;
+        pushToast(`New artifact discovered: ${artifact.name}!`, 4000, "cosmic");
+      } else {
+        resultDiv.textContent = `Duplicate: ${artifact.name} - ${artifact.desc}`;
+        pushToast(`Found duplicate: ${artifact.name}`, 3000);
+      }
+      
+      resultDiv.classList.add("show", artifact.rarity);
+      
+      playBeep("golden");
+      saveGame();
+      checkAchievements();
+      
+      canvas.style.cursor = "default";
+      canvas.onmousedown = null;
+      canvas.onmousemove = null;
+      canvas.onmouseup = null;
+    }
+    
+    canvas.onmousedown = (e) => {
+      isScratching = true;
+      const rect = canvas.getBoundingClientRect();
+      scratch(e.clientX - rect.left, e.clientY - rect.top);
+    };
+    
+    canvas.onmousemove = (e) => {
+      if (isScratching) {
+        const rect = canvas.getBoundingClientRect();
+        scratch(e.clientX - rect.left, e.clientY - rect.top);
+      }
+    };
+    
+    canvas.onmouseup = () => {
+      isScratching = false;
+    };
+    
+    canvas.onmouseleave = () => {
+      isScratching = false;
+    };
+  }
+
+  function openMuseum() {
+    museumFullscreen.classList.add("active");
+    renderMuseum();
+  }
+
+  function renderMuseum() {
+    const totalArtifacts = ARTIFACTS.length;
+    const collectedArtifacts = state.unlockedArtifacts.length;
+    const percentage = Math.floor((collectedArtifacts / totalArtifacts) * 100);
+    
+    document.getElementById("museum-collected").textContent = collectedArtifacts;
+    document.getElementById("museum-total").textContent = totalArtifacts;
+    document.getElementById("museum-percentage").textContent = `${percentage}%`;
+    
+    const rarities = ['common', 'rare', 'legendary', 'mythic', 'eternal'];
+    
+    rarities.forEach(rarity => {
+      const grid = document.getElementById(`museum-${rarity}`);
+      if (!grid) return;
+      
+      grid.innerHTML = "";
+      const artifactsOfRarity = ARTIFACTS.filter(a => a.rarity === rarity);
+      
+      artifactsOfRarity.forEach(artifact => {
+        const isUnlocked = state.unlockedArtifacts.includes(artifact.id);
+        
+        const item = document.createElement("div");
+        item.className = `museum-item ${!isUnlocked ? "locked" : ""}`;
+        
+        item.innerHTML = `
+          <div class="museum-item-icon">${isUnlocked ? artifact.icon : "❓"}</div>
+          <div class="museum-item-name">${isUnlocked ? artifact.name : "???"}</div>
+          <div class="museum-item-rarity rarity-${rarity}">${rarity.toUpperCase()}</div>
+        `;
+        
+        grid.appendChild(item);
+      });
+    });
+  }
+
+  function updateArtifactsModal() {
+    const shardsDisplay = document.getElementById("artifact-shards-display");
+    if (shardsDisplay) {
+      shardsDisplay.textContent = state.artifactShards || 0;
+    }
+    
+    if (buyScratchoffBtn) {
+      buyScratchoffBtn.disabled = state.artifactShards < 3;
+    }
+  }
+
   openBlackjackBtn.addEventListener("click", () => {
     blackjackFullscreen.classList.add("active");
     updateBlackjackUI();
@@ -369,8 +725,15 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       blackjackFullscreen.classList.remove("active");
+      scratchoffFullscreen.classList.remove("active");
+      museumFullscreen.classList.remove("active");
       dailyModal.classList.remove("active");
       importModal.classList.remove("active");
+      cosmeticsModal.classList.remove("active");
+      achievementsModal.classList.remove("active");
+      statsModal.classList.remove("active");
+      settingsModal.classList.remove("active");
+      artifactsModal.classList.remove("active");
       if (creditsModal) creditsModal.classList.remove("active");
     }
   });
@@ -648,19 +1011,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  const sideTabButtons = document.querySelectorAll(".side-tab-btn");
-  const sideTabPanels = document.querySelectorAll(".side-tab-panel");
-  sideTabButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      sideTabButtons.forEach(b => b.classList.remove("active"));
-      sideTabPanels.forEach(p => p.classList.remove("active"));
-      btn.classList.add("active");
-      const t = btn.dataset.sidetab;
-      const target = document.getElementById(`side-tab-${t}`);
-      if (target) target.classList.add("active");
-    });
-  });
-
   const shopSubtabButtons = document.querySelectorAll(".shop-subtab-btn");
   const shopSubtabPanels = document.querySelectorAll(".shop-subtab-panel");
   shopSubtabButtons.forEach(btn => {
@@ -690,64 +1040,6 @@ document.addEventListener("DOMContentLoaded", () => {
     o.start(now);
     o.stop(now + 0.16);
   }
-
-  function initBackgroundMusic() {
-    if (!audioCtx) return;
-    
-    const osc1 = audioCtx.createOscillator();
-    const osc2 = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    
-    osc1.type = "sine";
-    osc2.type = "sine";
-    
-    osc1.frequency.value = 220;
-    osc2.frequency.value = 330;
-    
-    gainNode.gain.value = 0.03;
-    
-    osc1.connect(gainNode);
-    osc2.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    backgroundMusic = { osc1, osc2, gainNode };
-  }
-
-  function toggleBackgroundMusic(enabled) {
-    if (!audioCtx) return;
-    
-    if (enabled) {
-      if (!backgroundMusic) {
-        initBackgroundMusic();
-      }
-      if (backgroundMusic && backgroundMusic.osc1) {
-        try {
-          backgroundMusic.osc1.start();
-          backgroundMusic.osc2.start();
-        } catch(e) {
-          initBackgroundMusic();
-          backgroundMusic.osc1.start();
-          backgroundMusic.osc2.start();
-        }
-      }
-    } else {
-      if (backgroundMusic && backgroundMusic.osc1) {
-        try {
-          backgroundMusic.osc1.stop();
-          backgroundMusic.osc2.stop();
-          backgroundMusic = null;
-        } catch(e) {
-          // Already stopped
-        }
-      }
-    }
-  }
-
-  musicToggle.addEventListener("change", () => {
-    state.musicEnabled = musicToggle.checked;
-    toggleBackgroundMusic(state.musicEnabled);
-    saveGame();
-  });
 
   function renderCosmetics() {
     cosmeticsGrid.innerHTML = "";
@@ -906,8 +1198,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (achProgressText) {
       achProgressText.textContent = `${percentage}%`;
-    }
-  }
+    }}
 
   function markAchievementUnlocked(a) {
     a.unlocked = true;
@@ -941,10 +1232,27 @@ document.addEventListener("DOMContentLoaded", () => {
       state.points += (reward.amount || 0);
     } else if (reward.type === "prestigePoints") {
       state.prestigePoints = (state.prestigePoints || 0) + (reward.amount || 0);
+      if (!state.prestigePointsDiscovered) state.prestigePointsDiscovered = true;
     } else if (reward.type === "clickPower") {
       state.clickPower += (reward.amount || 0);
     }
     updateUI();
+  }
+
+  function updateStatsModal() {
+    document.getElementById("stat-clicks").textContent = formatNumber(state.totalClicks || 0);
+    document.getElementById("stat-earned").textContent = formatNumber(state.totalPointsEarned || 0);
+    document.getElementById("stat-upgrades").textContent = state.totalUpgradesBought || 0;
+    document.getElementById("stat-golden").textContent = state.goldenClicks || 0;
+    document.getElementById("stat-playtime").textContent = formatTime(state.playTime || 0);
+    document.getElementById("stat-prestiges").textContent = state.totalPrestiges || 0;
+    document.getElementById("stat-ascensions").textContent = state.totalAscensions || 0;
+    
+    const cpm = state.playTime > 0 ? Math.floor((state.totalClicks || 0) / (state.playTime / 60)) : 0;
+    document.getElementById("stat-cpm").textContent = formatNumber(cpm);
+    
+    const clickSpeed = state.playTime > 0 ? ((state.totalClicks || 0) / (state.playTime * 60)).toFixed(2) : "0";
+    document.getElementById("stat-clickspeed").textContent = clickSpeed;
   }
 
   function getBulkBuyCost(upgrade) {
@@ -973,54 +1281,64 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function renderShopCategory(category, gridElement) {
-    gridElement.innerHTML = "";
-    const categoryUpgrades = upgrades.filter(u => u.category === category && isUpgradeUnlocked(u));
+function renderShopCategory(category, gridElement) {
+  gridElement.innerHTML = "";
+  const categoryUpgrades = upgrades.filter(u => u.category === category && isUpgradeUnlocked(u) && !shouldHideUpgrade(u));
+  
+  categoryUpgrades.forEach(u => {
+    if (u.oneTime && u.level >= 1) return;
     
-    categoryUpgrades.forEach(u => {
-      if (u.oneTime && u.level >= 1) return;
-      
-      const card = document.createElement("div");
-      card.className = "upgrade-card";
-      
-      let effectText = "";
-      if (u.type === "idle") effectText = `+${formatNumber(u.effect)}/s`;
-      else if (u.type === "click") effectText = `+${formatNumber(u.effect)} power`;
-      else if (u.type === "multi") effectText = `x${u.effect}`;
-      else if (u.type === "combo_limit") effectText = `+${u.effect} limit`;
-      else if (u.type === "special" || u.type === "special_golden" || u.type === "special_combo") {
-        effectText = "";
-      }
-      
-      const bulkInfo = !u.oneTime ? getBulkBuyCost(u) : { cost: u.cost, amount: 1 };
-      const displayCost = bulkInfo.cost;
-      const displayAmount = bulkInfo.amount;
-      
-      const buyText = state.bulkBuyAmount === "max" ? `Buy ${displayAmount}` : 
-                      state.bulkBuyAmount === 1 ? "Buy" : `Buy ${displayAmount}`;
-      
-      const canAfford = state.points >= displayCost && displayAmount > 0;
-      
-      card.innerHTML = `
-        <div class="row">
-          <div>
-            <div class="upgrade-title">${u.name} ${effectText}</div>
-            <div class="upgrade-desc">${u.desc}</div>
-          </div>
-          <div style="text-align:right">
-            <div class="upgrade-cost" id="cost-${u.id}">${formatNumber(displayCost)}</div>
-            <div style="height:4px"></div>
-            <button class="buy-btn" id="buy-${u.id}" ${!canAfford ? 'disabled' : ''}>${buyText}</button>
-            ${!u.oneTime ? `<div class="upgrade-desc">Lvl: <span id="lvl-${u.id}">${u.level}</span></div>` : ''}
-          </div>
+    const card = document.createElement("div");
+    card.className = "upgrade-card";
+    
+    // FIXED: Don't show effect text for combo_limit upgrades
+    let effectText = "";
+    if (u.type === "idle") effectText = `+${formatNumber(u.effect)}/s`;
+    else if (u.type === "click") effectText = `+${formatNumber(u.effect)} power`;
+    else if (u.type === "multi") effectText = `x${u.effect}`;
+    else if (u.type === "combo_limit" || u.type === "special" || u.type === "special_golden" || u.type === "special_combo") {
+      effectText = "";
+    }
+    
+    const bulkInfo = !u.oneTime ? getBulkBuyCost(u) : { cost: u.cost, amount: 1 };
+    const displayCost = bulkInfo.cost;
+    const displayAmount = bulkInfo.amount;
+    
+    const buyText = state.bulkBuyAmount === "max" ? `Buy ${displayAmount}` : 
+                    state.bulkBuyAmount === 1 ? "Buy" : `Buy ${displayAmount}`;
+    
+    const canAfford = state.points >= displayCost && displayAmount > 0;
+    
+    // Show max level if it exists
+    let levelDisplay = '';
+    if (!u.oneTime && u.maxLevel) {
+      levelDisplay = `<div class="upgrade-desc">Lvl: <span id="lvl-${u.id}">${u.level}</span>/${u.maxLevel}</div>`;
+    } else if (!u.oneTime) {
+      levelDisplay = `<div class="upgrade-desc">Lvl: <span id="lvl-${u.id}">${u.level}</span></div>`;
+    } else if (u.maxLevel) {
+      levelDisplay = `<div class="upgrade-desc">Lvl: <span id="lvl-${u.id}">${u.level}</span>/${u.maxLevel}</div>`;
+    }
+    
+    card.innerHTML = `
+      <div class="row">
+        <div>
+          <div class="upgrade-title">${u.name} ${effectText}</div>
+          <div class="upgrade-desc">${u.desc}</div>
         </div>
-      `;
-      gridElement.appendChild(card);
-      
-      const buyBtn = card.querySelector(`#buy-${u.id}`);
-      buyBtn.addEventListener("click", () => tryBuy(u.id));
-    });
-  }
+        <div style="text-align:right">
+          <div class="upgrade-cost" id="cost-${u.id}">${formatNumber(displayCost)}</div>
+          <div style="height:4px"></div>
+          <button class="buy-btn" id="buy-${u.id}" ${!canAfford ? 'disabled' : ''}>${buyText}</button>
+          ${levelDisplay}
+        </div>
+      </div>
+    `;
+    gridElement.appendChild(card);
+    
+    const buyBtn = card.querySelector(`#buy-${u.id}`);
+    buyBtn.addEventListener("click", () => tryBuy(u.id));
+  });
+}
 
   function renderShops() {
     renderShopCategory("workers", workersGrid);
@@ -1040,6 +1358,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const isOneTime = u.oneTime;
       const isOwned = u.level >= 1 && isOneTime;
       
+      // Show max level if it exists
+      let levelDisplay = '';
+      if (!isOneTime && u.maxLevel) {
+        levelDisplay = `<div class="upgrade-desc">Lvl: <span id="lvl-pp-${u.id}">${u.level}</span>/${u.maxLevel}</div>`;
+      } else if (!isOneTime) {
+        levelDisplay = `<div class="upgrade-desc">Lvl: <span id="lvl-pp-${u.id}">${u.level}</span></div>`;
+      } else if (u.maxLevel) {
+        levelDisplay = `<div class="upgrade-desc">Lvl: <span id="lvl-pp-${u.id}">${u.level}</span>/${u.maxLevel}</div>`;
+      }
+      
       card.innerHTML = `
         <div class="row">
           <div>
@@ -1050,7 +1378,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="upgrade-cost">${formatNumber(u.cost)} PP</div>
             <div style="height:4px"></div>
             <button class="buy-btn" id="buy-pp-${u.id}" ${isOwned ? 'disabled' : ''}>${isOwned ? 'Owned' : 'Buy'}</button>
-            ${!isOneTime ? `<div class="upgrade-desc">Lvl: <span id="lvl-pp-${u.id}">${u.level}</span></div>` : ''}
+            ${levelDisplay}
           </div>
         </div>
       `;
@@ -1118,7 +1446,6 @@ document.addEventListener("DOMContentLoaded", () => {
     else if (up.type === "multi") state.multiplier *= Math.pow(up.effect, bulkInfo.amount);
     else if (up.type === "special_golden") {
       state.goldenUnlocked = true;
-      goldenChanceDiv.style.display = "block";
       pushToast("Golden clicks unlocked!", 3000, "success");
     }
     else if (up.type === "special_combo") {
@@ -1155,7 +1482,6 @@ document.addEventListener("DOMContentLoaded", () => {
     
     if (up.type === "golden_unlock") {
       state.goldenUnlocked = true;
-      goldenChanceDiv.style.display = "block";
       pushToast("Golden clicks unlocked permanently!", 3000, "success");
     } else if (up.type === "combo_unlock") {
       state.comboUnlocked = true;
@@ -1170,18 +1496,37 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     renderPrestigeShop();
+    renderShops(); // Re-render shops to hide upgrades if permanent versions bought
     updateUI();
     saveGame();
   }
 
   function onCircleClick(clientX, clientY) {
     const isGolden = state.goldenUnlocked && Math.random() < getGoldenChance();
+    const isArtifactShard = Math.random() < ARTIFACT_SHARD_CHANCE;
     const mult = isGolden ? 10 : 1;
     const gained = calcClickPower() * mult;
     
     state.points += gained;
     state.totalClicks = (state.totalClicks || 0) + 1;
     state.totalPointsEarned = (state.totalPointsEarned || 0) + gained;
+    
+    if (isArtifactShard) {
+      state.artifactShards = (state.artifactShards || 0) + 1;
+      
+      if (!state.artifactsDiscovered) {
+        state.artifactsDiscovered = true;
+        artifactSideSection.style.display = "block";
+        pushToast("✨ ARTIFACT SHARD DISCOVERED! Check the Artifacts tab!", 5000, "cosmic");
+      } else {
+        pushToast("✨ Artifact Shard found!", 3000, "cosmic");
+      }
+      
+      if (state.particlesEnabled) {
+        spawnParticles(clientX, clientY, 25, false, true);
+      }
+      playBeep("golden");
+    }
     
     if (isGolden) {
       state.goldenClicks = (state.goldenClicks || 0) + 1;
@@ -1192,7 +1537,9 @@ document.addEventListener("DOMContentLoaded", () => {
         goldenActive = false;
       }, 500);
       playBeep("golden");
-      pushToast(`GOLDEN! +${formatNumber(gained)}`, 1500, "golden");
+      if (state.goldenToastEnabled) {
+        pushToast(`GOLDEN! +${formatNumber(gained)}`, 1500, "golden");
+      }
     }
 
     if (state.comboUnlocked) {
@@ -1206,33 +1553,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     animatePop(circle);
-    if (state.particlesEnabled) {
-      spawnParticles(clientX, clientY, Math.min(15, Math.ceil(gained / 10)), isGolden);
+    if (state.particlesEnabled && !isArtifactShard) {
+      spawnParticles(clientX, clientY, Math.min(15, Math.ceil(gained / 10)), isGolden, false);
     }
-    if (!isGolden) playBeep("click");
+    if (!isGolden && !isArtifactShard) playBeep("click");
     updateUI();
     checkAchievements();
   }
 
   function updateCombo() {
-    if (!state.comboUnlocked) {
-      comboMeter.classList.remove("active");
-      circle.classList.remove("combo-active");
-      return;
-    }
-    
-    const comboLimit = getComboLimit();
-    
-    if (comboCount >= COMBO_THRESHOLD) {
-      comboMeter.classList.add("active");
-      const displayCombo = Math.min(comboCount - COMBO_THRESHOLD + 2, comboLimit - COMBO_THRESHOLD + 2);
-      comboValue.textContent = displayCombo;
-      circle.classList.add("combo-active");
-    } else {
-      comboMeter.classList.remove("active");
-      circle.classList.remove("combo-active");
-    }
+  if (!state.comboUnlocked) {
+    comboMeter.classList.remove("active");
+    circle.classList.remove("combo-active");
+    return;
   }
+  
+  if (comboCount >= COMBO_THRESHOLD) {
+    comboMeter.classList.add("active");
+    // FIXED: Show actual combo multiplier correctly
+    const comboLimit = getComboLimit();
+    const displayCombo = Math.min(comboCount, comboLimit) - COMBO_THRESHOLD + 2;
+    comboValue.textContent = displayCombo;
+    circle.classList.add("combo-active");
+  } else {
+    comboMeter.classList.remove("active");
+    circle.classList.remove("combo-active");
+  }
+}
 
   function animatePop(el) {
     el.classList.remove("pop");
@@ -1240,14 +1587,15 @@ document.addEventListener("DOMContentLoaded", () => {
     el.classList.add("pop");
   }
 
-  function spawnParticles(clientX, clientY, count = 6, golden = false) {
+  function spawnParticles(clientX, clientY, count = 6, golden = false, cosmic = false) {
     const rect = particleLayer.getBoundingClientRect();
     const layerX = clientX - rect.left;
     const layerY = clientY - rect.top;
     for (let i = 0; i < count; i++) {
       const p = document.createElement("div");
       p.className = "particle";
-      if (golden) p.classList.add("golden");
+      if (cosmic) p.classList.add("cosmic");
+      else if (golden) p.classList.add("golden");
       else if (comboCount >= COMBO_THRESHOLD * 2) p.classList.add("rainbow");
       p.style.left = `${layerX + (Math.random() * 50 - 25)}px`;
       p.style.top = `${layerY + (Math.random() * 50 - 25)}px`;
@@ -1287,6 +1635,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     state.prestigePoints = (state.prestigePoints || 0) + potential;
     state.totalPrestiges = (state.totalPrestiges || 0) + 1;
+    
+    if (!state.prestigePointsDiscovered) state.prestigePointsDiscovered = true;
 
     state.points = 0;
     state.clickPower = 1;
@@ -1352,6 +1702,8 @@ document.addEventListener("DOMContentLoaded", () => {
     state.ascensionLevel = newLevel;
     state.totalAscensions = (state.totalAscensions || 0) + 1;
     
+    if (!state.ascensionLevelDiscovered) state.ascensionLevelDiscovered = true;
+    
     state.points = 0;
     state.clickPower = 1;
     state.multiplier = 1;
@@ -1410,10 +1762,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const newTokens = (state.transcensionTokens || 0) + 1;
     const multiplier = getTranscensionMultiplier() + 5;
     
-    if (!confirm(`Transcend reality for 1 Eternal Token? This will give you a massive ${multiplier.toFixed(2)}x multiplier but reset EVERYTHING except cosmetics.`)) return;
+    if (!confirm(`Transcend reality for 1 Eternal Token? This will give you a massive ${multiplier.toFixed(2)}x multiplier but reset EVERYTHING except cosmetics and artifacts.`)) return;
 
     state.transcensionTokens = newTokens;
     state.totalTranscensions = (state.totalTranscensions || 0) + 1;
+    
+    if (!state.transcensionTokensDiscovered) state.transcensionTokensDiscovered = true;
     
     state.points = 0;
     state.clickPower = 1;
@@ -1445,12 +1799,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const hasPrestiged = (state.totalPrestiges || 0) > 0;
     const hasAscended = (state.totalAscensions || 0) > 0;
     
-    // Prestige tab is always unlocked
     if (prestigeTabBtn) {
       prestigeTabBtn.classList.remove("locked");
     }
     
-    // Ascension unlocks after first prestige
     if (ascensionTabBtn) {
       if (hasPrestiged) {
         ascensionTabBtn.classList.remove("locked");
@@ -1459,7 +1811,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    // Transcension unlocks after first ascension
     if (transcensionTabBtn) {
       if (hasAscended) {
         transcensionTabBtn.classList.remove("locked");
@@ -1468,13 +1819,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    // Show currency HUD elements when player owns that currency
-    const hasPrestigePoints = (state.prestigePoints || 0) > 0;
-    const hasAscensionLevel = (state.ascensionLevel || 0) > 0;
-    const hasTranscensionTokens = (state.transcensionTokens || 0) > 0;
-    
+    // Currency HUD visibility - once discovered, always shown
     if (prestigePointsHud) {
-      if (hasPrestigePoints || hasPrestiged) {
+      if (state.prestigePointsDiscovered) {
         prestigePointsHud.classList.remove("hidden");
       } else {
         prestigePointsHud.classList.add("hidden");
@@ -1482,7 +1829,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     if (ascensionLevelHud) {
-      if (hasAscensionLevel || hasAscended) {
+      if (state.ascensionLevelDiscovered) {
         ascensionLevelHud.classList.remove("hidden");
       } else {
         ascensionLevelHud.classList.add("hidden");
@@ -1490,10 +1837,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     if (transcensionTokensHud) {
-      if (hasTranscensionTokens || state.totalTranscensions > 0) {
+      if (state.transcensionTokensDiscovered) {
         transcensionTokensHud.classList.remove("hidden");
       } else {
         transcensionTokensHud.classList.add("hidden");
+      }
+    }
+    
+    // Artifact side section visibility
+    if (artifactSideSection) {
+      if (state.artifactsDiscovered) {
+        artifactSideSection.style.display = "block";
+      } else {
+        artifactSideSection.style.display = "none";
+      }
+    }
+    
+    // Golden Chance visibility - only show if player actually owns the upgrade
+    if (goldenChanceDiv) {
+      const hasGoldenUpgrade = upgrades.find(u => u.id === "golden1" && u.level >= 1);
+      const ppGoldenUnlock = prestigeUpgrades.find(p => p.id === "pp_golden_unlock" && p.level >= 1);
+      
+      if ((hasGoldenUpgrade || ppGoldenUnlock) && state.goldenUnlocked) {
+        goldenChanceDiv.style.display = "block";
+      } else {
+        goldenChanceDiv.style.display = "none";
       }
     }
   }
@@ -1633,6 +2001,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!state.transcensionTokens) state.transcensionTokens = 0;
       if (!state.totalTranscensions) state.totalTranscensions = 0;
       if (!state.comboUpgradeLevel) state.comboUpgradeLevel = 0;
+      if (!state.artifactShards) state.artifactShards = 0;
+      if (state.artifactsDiscovered === undefined) state.artifactsDiscovered = false;
+      if (!state.unlockedArtifacts) state.unlockedArtifacts = [];
+      if (state.prestigePointsDiscovered === undefined) state.prestigePointsDiscovered = false;
+      if (state.ascensionLevelDiscovered === undefined) state.ascensionLevelDiscovered = false;
+      if (state.transcensionTokensDiscovered === undefined) state.transcensionTokensDiscovered = false;
+      if (state.toastsEnabled === undefined) state.toastsEnabled = true;
+      if (state.bugToastEnabled === undefined) state.bugToastEnabled = true;
+      if (state.goldenToastEnabled === undefined) state.goldenToastEnabled = true;
       
       importModal.classList.remove("active");
       importText.value = "";
@@ -1664,6 +2041,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   particlesToggle.addEventListener("change", () => {
     state.particlesEnabled = particlesToggle.checked;
+    saveGame();
+  });
+
+  toastsToggle.addEventListener("change", () => {
+    state.toastsEnabled = toastsToggle.checked;
+    saveGame();
+  });
+
+  bugToastToggle.addEventListener("change", () => {
+    state.bugToastEnabled = bugToastToggle.checked;
+    saveGame();
+  });
+
+  goldenToastToggle.addEventListener("change", () => {
+    state.goldenToastEnabled = goldenToastToggle.checked;
     saveGame();
   });
 
@@ -1751,11 +2143,36 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!state.transcensionTokens) state.transcensionTokens = 0;
       if (!state.totalTranscensions) state.totalTranscensions = 0;
       if (!state.comboUpgradeLevel) state.comboUpgradeLevel = 0;
+      if (!state.artifactShards) state.artifactShards = 0;
+      if (state.artifactsDiscovered === undefined) state.artifactsDiscovered = false;
+      if (!state.unlockedArtifacts) state.unlockedArtifacts = [];
+      if (state.prestigePointsDiscovered === undefined) state.prestigePointsDiscovered = false;
+      if (state.ascensionLevelDiscovered === undefined) state.ascensionLevelDiscovered = false;
+      if (state.transcensionTokensDiscovered === undefined) state.transcensionTokensDiscovered = false;
+      if (state.toastsEnabled === undefined) state.toastsEnabled = true;
+      if (state.bugToastEnabled === undefined) state.bugToastEnabled = true;
+      if (state.goldenToastEnabled === undefined) state.goldenToastEnabled = true;
+      
+      // Auto-discover currencies if player already has them
+      if (state.prestigePoints > 0 || state.totalPrestiges > 0) {
+        state.prestigePointsDiscovered = true;
+      }
+      if (state.ascensionLevel > 0 || state.totalAscensions > 0) {
+        state.ascensionLevelDiscovered = true;
+      }
+      if (state.transcensionTokens > 0 || state.totalTranscensions > 0) {
+        state.transcensionTokensDiscovered = true;
+      }
+      if (state.artifactShards > 0) {
+        state.artifactsDiscovered = true;
+      }
       
       document.body.className = `theme-${state.theme || 'dark'}`;
       soundToggle.checked = state.soundEnabled !== false;
-      musicToggle.checked = state.musicEnabled === true;
       particlesToggle.checked = state.particlesEnabled !== false;
+      toastsToggle.checked = state.toastsEnabled !== false;
+      bugToastToggle.checked = state.bugToastEnabled !== false;
+      goldenToastToggle.checked = state.goldenToastEnabled !== false;
       document.querySelectorAll(".theme-btn").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.theme === (state.theme || 'dark'));
       });
@@ -1765,7 +2182,6 @@ document.addEventListener("DOMContentLoaded", () => {
       
       if ((ppGoldenUnlock && ppGoldenUnlock.level >= 1) || state.goldenUnlocked) {
         state.goldenUnlocked = true;
-        goldenChanceDiv.style.display = "block";
       }
       
       if ((ppComboUnlock && ppComboUnlock.level >= 1) || state.comboUnlocked) {
@@ -1787,25 +2203,33 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function resetGame() {
-    if (!confirm("Reset ALL progress including prestige, ascension and transcension?")) return;
+    if (!confirm("Reset ALL progress including prestige, ascension, transcension AND artifacts?")) return;
     state = { 
-      points: 0, clickPower: 1, multiplier: 1, version: 8, 
+      points: 0, clickPower: 1, multiplier: 1, version: 10, 
       totalClicks: 0, totalPointsEarned: 0, totalUpgradesBought: 0, 
       prestigePoints: 0, goldenClicks: 0, totalPrestiges: 0, totalAscensions: 0, totalTranscensions: 0,
       ascensionLevel: 0, transcensionTokens: 0, comboUpgradeLevel: 0,
       lastSaveTime: Date.now(), playTime: 0, theme: 'dark',
-      soundEnabled: true, musicEnabled: false, particlesEnabled: true,
+      soundEnabled: true, particlesEnabled: true, toastsEnabled: true,
+      bugToastEnabled: true, goldenToastEnabled: true,
       lastDailyReward: 0, dailyStreak: 0,
       goldenUnlocked: false, comboUnlocked: false,
       currentCosmetic: 'default',
       ownedCosmetics: ['default'],
-      bulkBuyAmount: 1
+      bulkBuyAmount: 1,
+      artifactShards: 0,
+      artifactsDiscovered: false,
+      unlockedArtifacts: [],
+      prestigePointsDiscovered: false,
+      ascensionLevelDiscovered: false,
+      transcensionTokensDiscovered: false,
     };
     upgrades.forEach(u => { u.level = 0; u.cost = u.baseCost; });
     prestigeUpgrades.forEach(u => { u.level = 0; u.cost = u.baseCost; });
     achievements.forEach(a => a.unlocked = false);
     localStorage.removeItem(SAVE_KEY);
     goldenChanceDiv.style.display = "none";
+    artifactSideSection.style.display = "none";
     updateUI();
     renderShops();
     renderPrestigeShop();
@@ -1844,6 +2268,10 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("transcension-tokens").textContent = state.transcensionTokens || 0;
     }
     
+    if (artifactShardsSide) {
+      artifactShardsSide.textContent = state.artifactShards || 0;
+    }
+    
     if (prestigeBoostEl) {
       const prestigeBoost = (1 + (state.prestigePoints || 0) * PRESTIGE_MULT_PER_POINT);
       prestigeBoostEl.textContent = prestigeBoost.toFixed(2);
@@ -1852,20 +2280,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (state.goldenUnlocked) {
       if (goldenPct) goldenPct.textContent = (getGoldenChance() * 100).toFixed(1);
     }
-    
-    document.getElementById("stat-clicks").textContent = formatNumber(state.totalClicks || 0);
-    document.getElementById("stat-earned").textContent = formatNumber(state.totalPointsEarned || 0);
-    document.getElementById("stat-upgrades").textContent = state.totalUpgradesBought || 0;
-    document.getElementById("stat-golden").textContent = state.goldenClicks || 0;
-    document.getElementById("stat-playtime").textContent = formatTime(state.playTime || 0);
-    document.getElementById("stat-prestiges").textContent = state.totalPrestiges || 0;
-    document.getElementById("stat-ascensions").textContent = state.totalAscensions || 0;
-    
-    const cpm = state.playTime > 0 ? Math.floor((state.totalClicks || 0) / (state.playTime / 60)) : 0;
-    document.getElementById("stat-cpm").textContent = formatNumber(cpm);
-    
-    const clickSpeed = state.playTime > 0 ? ((state.totalClicks || 0) / (state.playTime * 60)).toFixed(2) : "0";
-    document.getElementById("stat-clickspeed").textContent = clickSpeed;
     
     updateShopButtons();
     updateBlackjackUI();
@@ -1985,7 +2399,9 @@ document.addEventListener("DOMContentLoaded", () => {
       state.totalPointsEarned += reward;
       
       bug.classList.add("bug-squished");
-      pushToast(`Squished! +${formatNumber(reward)}`, 2000, "success");
+      if (state.bugToastEnabled) {
+        pushToast(`Squished! +${formatNumber(reward)}`, 2000, "success");
+      }
       playBeep("golden");
       
       setTimeout(() => {
