@@ -36,7 +36,6 @@
           </div>
         </div>
         
-        <!-- Artifact section in side panel -->
         <div id="artifact-side-section" style="display:none;margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,0.05)">
           <div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:8px">Artifact Shards</div>
           <div style="text-align:center;font-size:22px;font-weight:800;color:#c084fc;margin-bottom:12px">
@@ -90,7 +89,6 @@
 
         <div id="particle-layer" aria-hidden="true"></div>
       </section>
-
       <aside class="shop">
         <div class="shop-top">
           <h2>Menu</h2>
@@ -105,14 +103,14 @@
 
         <div class="tab-panels">
           <div id="tab-shop" class="tab-panel active">
-            <div class="shop-subtabs">
+            <div class="shop-subtabs shop-sticky-header">
               <div class="shop-subtabs-center">
                 <button class="shop-subtab-btn active" data-shop="workers">👷 Workers</button>
                 <button class="shop-subtab-btn" data-shop="clicks">👆 Click Upgrades</button>
                 <button class="shop-subtab-btn" data-shop="multipliers">✨ Multipliers</button>
               </div>
             </div>
-            <div class="bulk-buy-controls" style="margin-bottom:16px;display:flex;gap:6px;justify-content:flex-end">
+            <div class="bulk-buy-controls shop-sticky-header" style="margin-bottom:16px;display:flex;gap:6px;justify-content:flex-end">
               <button class="bulk-btn active" data-amount="1">x1</button>
               <button class="bulk-btn" data-amount="10">x10</button>
               <button class="bulk-btn" data-amount="100">x100</button>
@@ -228,10 +226,9 @@
     <footer>
       <small>Prestige, Ascend and Transcend | Discover new upgrades as you progress | Collect Artifacts</small>
       <br />
-      <small>Version 1.5</small>
+      <small>Version 1.6</small>
     </footer>
   </div>
-
   <!-- FULLSCREEN BLACKJACK OVERLAY -->
   <div id="blackjack-fullscreen">
     <div class="blackjack-fullscreen-container">
@@ -377,7 +374,7 @@
           <label><input type="checkbox" id="particles-toggle" checked /></label>
         </div>
         <div class="setting-item">
-          <span>📢 All Notifications</span>
+          <span>🔔 All Notifications</span>
           <label><input type="checkbox" id="toasts-toggle" checked /></label>
         </div>
         <div class="setting-item">
@@ -400,7 +397,6 @@
       </div>
     </div>
   </div>
-
   <!-- ARTIFACTS MODAL -->
   <div id="artifacts-modal" class="modal">
     <div class="modal-content" style="max-width:700px">
@@ -418,6 +414,11 @@
         <button id="buy-scratchoff" class="buy-btn" style="font-size:18px;padding:14px 24px;background:linear-gradient(135deg, #a855f7, #ec4899)">
           🎫 Buy Scratch-Off (3 Shards)
         </button>
+      </div>
+      <div style="text-align:center;padding:12px;background:rgba(168,85,247,0.1);border-radius:8px;margin-bottom:16px">
+        <div style="font-size:14px;color:var(--muted);margin-bottom:6px">Artifact Shard Chance</div>
+        <div style="font-size:20px;font-weight:700;color:#c084fc"><span id="artifact-shard-odds">1 in 100,000</span> per click</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;font-style:italic">💡 Tip: Increase your chance by discovering new artifacts!</div>
       </div>
       <div style="text-align:center;margin-top:20px">
         <button id="open-museum" class="buy-btn" style="font-size:16px;padding:12px 20px;background:linear-gradient(135deg, #0891b2, #0e7490)">
@@ -495,7 +496,7 @@
   <div id="credits-modal" class="modal" aria-hidden="true">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>🎖️ Credits – Version 1.5</h3>
+        <h3>🎖️ Credits – Version 1.6</h3>
         <button class="modal-close" id="credits-close">×</button>
       </div>
 
@@ -519,6 +520,83 @@
       </div>
       <textarea id="import-text" style="width:100%;height:150px;padding:8px;border-radius:6px;background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.1)" placeholder="Paste your save data here"></textarea>
       <button id="import-confirm" class="buy-btn" style="margin-top:12px;width:100%">Import</button>
+    </div>
+  </div>
+
+  <!-- CUSTOM CONFIRMATION MODAL -->
+  <div id="confirm-modal" class="confirm-modal">
+    <div class="confirm-modal-content">
+      <div class="confirm-modal-title" id="confirm-title">Confirm Action</div>
+      <div class="confirm-modal-message" id="confirm-message">Are you sure?</div>
+      <div class="confirm-modal-buttons">
+        <button class="confirm-modal-confirm" id="confirm-yes">Confirm</button>
+        <button class="confirm-modal-cancel" id="confirm-no">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <!-- WELCOME MODAL -->
+  <div id="welcome-modal" class="welcome-modal">
+    <div class="welcome-modal-content">
+      <div class="welcome-modal-header">
+        <div class="welcome-modal-title">Welcome to Circle Clicker!</div>
+        <div class="welcome-modal-subtitle">"Who knew clicking a simple circle could become so complex?"</div>
+      </div>
+      
+      <div class="welcome-modal-body">
+        <div class="welcome-feature-list">
+          <div class="welcome-feature">
+            <div class="welcome-feature-icon">🎯</div>
+            <div class="welcome-feature-text">
+              <div class="welcome-feature-title">Click to Ascend</div>
+              <div class="welcome-feature-desc">Start clicking the circle and watch your numbers grow. Simple at first, but there's much more beneath the surface...</div>
+            </div>
+          </div>
+          
+          <div class="welcome-feature">
+            <div class="welcome-feature-icon">🚀</div>
+            <div class="welcome-feature-text">
+              <div class="welcome-feature-title">Prestige, Ascend & Transcend</div>
+              <div class="welcome-feature-desc">Reset your progress for powerful permanent bonuses. Each layer unlocks new possibilities and multiplies your power exponentially!</div>
+            </div>
+          </div>
+          
+          <div class="welcome-feature">
+            <div class="welcome-feature-icon">🎲</div>
+            <div class="welcome-feature-text">
+              <div class="welcome-feature-title">Squish Bugs & Gamble</div>
+              <div class="welcome-feature-desc">Random bugs appear that you can squish for bonuses. Try your luck at blackjack or test your intuition with the number guessing game!</div>
+            </div>
+          </div>
+          
+          <div class="welcome-feature">
+            <div class="welcome-feature-icon">🔍</div>
+            <div class="welcome-feature-text">
+              <div class="welcome-feature-title">Discover Secrets</div>
+              <div class="welcome-feature-desc">Hidden achievements, secret cosmetics, and mysterious artifacts await. Keep your eyes open for surprises!</div>
+            </div>
+          </div>
+          
+          <div class="welcome-feature">
+            <div class="welcome-feature-icon">✨</div>
+            <div class="welcome-feature-text">
+              <div class="welcome-feature-title">1 in 100,000 Chance</div>
+              <div class="welcome-feature-desc">Every click has a tiny chance to drop an Artifact Shard—a secret currency that unlocks a whole new collection system. Will you be lucky?</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="welcome-modal-footer">
+        <div class="welcome-support-text">
+          Thank you for playing! If you enjoy the game and want to support development, consider buying me a coffee!
+        </div>
+        <div class="welcome-buttons">
+          <a href="https://ko-fi.com/fooping" target="_blank" class="welcome-kofi-btn">
+            ☕ Support on Ko-fi
+          </a>
+          <button class="welcome-close-btn" id="welcome-close">Start Clicking!</button>
+        </div>
+      </div>
     </div>
   </div>
 
